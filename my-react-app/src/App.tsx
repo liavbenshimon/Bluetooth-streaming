@@ -1,120 +1,36 @@
-// --- React Web App (using WebSockets) ---
+import { useState } from "react";
 
-import React, { useState, useEffect } from "react";
-
-function BluetoothApp() {
-  const [devices, setDevices] = useState([]);
-  const [selectedDevice, setSelectedDevice] = useState(null);
-  const [batteryLevel, setBatteryLevel] = useState(null);
-  const [socket, setSocket] = useState(null);
+function App() {
+  const [deviceName, setDeviceName] = useState(null);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(false); // Add a loading state
 
-  useEffect(() => {
-    // Connect to the native app's WebSocket server
-    const ws = new WebSocket("ws://localhost:8765"); // Replace with your native app's address
+  const connectToBluetooth = async () => {
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true, // אפשר גם לסנן לפי שירותים מסוימים
+      });
 
-    ws.onopen = () => {
-      console.log("Connected to native app");
-      setSocket(ws); // Store the socket in state
-      // Request the list of connected devices
-      ws.send(JSON.stringify({ type: "getDevices" }));
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log("Received from native app:", data);
-
-        if (data.type === "devicesList") {
-          setDevices(data.devices);
-          setLoading(false); // Turn off loading state when devices are received
-        } else if (data.type === "batteryLevel") {
-          setBatteryLevel(data.level);
-          setLoading(false); // Turn off loading state
-        } else if (data.type === "error") {
-          setError(data.message);
-          setLoading(false); // Turn off loading
-        }
-      } catch (e) {
-        console.error("Error parsing message from native app:", e);
-        setError("Error communicating with native app.");
-        setLoading(false);
-      }
-    };
-
-    ws.onclose = () => {
-      console.log("Disconnected from native app");
-      setSocket(null);
-      setError("Disconnected from native app.  Ensure it's running.");
-      setLoading(false);
-    };
-
-    ws.onerror = (err) => {
-      console.error("WebSocket error:", err);
-      setError("WebSocket error. Check console for details.");
-      setLoading(false);
-    };
-
-    // Cleanup function: close the WebSocket when the component unmounts
-    return () => {
-      if (ws) {
-        // Check if ws is defined (it might not be if the connection failed)
-        ws.close();
-      }
-    };
-  }, []); // Empty dependency array:  run this effect only once on mount
-
-  const getBattery = (device) => {
-    setSelectedDevice(device);
-    setBatteryLevel(null); // Clear previous battery level
-    setLoading(true); // Set loading to true when requesting battery
-    if (socket) {
-      socket.send(
-        JSON.stringify({ type: "getBattery", deviceAddress: device.address })
-      );
-    } else {
-      setError("Not connected to the native app."); // Handle case where socket isn't ready
+      setDeviceName(device.name || "Unknown Device");
+    } catch (err) {
+      setError("Failed to connect: " + err.message);
     }
   };
 
   return (
-    <div>
-      <h1>Bluetooth Devices</h1>
-      {error && <div style={{ color: "red" }}>{error}</div>}
-      {loading && <p>Loading...</p>} {/* Show loading indicator */}
-      {!loading && devices.length === 0 && (
-        <p>
-          No devices found. Make sure the native app is running and Bluetooth is
-          enabled.
-        </p>
-      )}
-      {!loading && devices.length > 0 && (
-        <ul>
-          {devices.map((device) => (
-            <li key={device.address}>
-              {device.name} ({device.address}){" "}
-              <button onClick={() => getBattery(device)} disabled={loading}>
-                Get Battery
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      {selectedDevice && batteryLevel !== null && (
-        <div>
-          <h2>Battery Level for {selectedDevice.name}</h2>
-          <p>{batteryLevel}%</p>
-        </div>
-      )}
-      {selectedDevice && batteryLevel === null && !loading && (
-        <div>
-          <h2>Battery Level for {selectedDevice.name}</h2>
-          <p>Battery information not available.</p>
-        </div>
-      )}
+    <div className="flex justify-center items-center min-h-screen bg-gray-100">
+      <div className="p-4 border rounded-lg shadow-lg text-center">
+        <h2 className="text-xl font-bold mb-2">Bluetooth Connector</h2>
+        <button
+          onClick={connectToBluetooth}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          Connect to Bluetooth
+        </button>
+        {deviceName && <p className="mt-4">Connected to: {deviceName}</p>}
+        {error && <p className="text-red-500">{error}</p>}
+      </div>
     </div>
   );
 }
 
-export default BluetoothApp;
+export default App;
